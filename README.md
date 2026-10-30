@@ -65,8 +65,8 @@ Porta-LAOB/
 
 > 💡 **Vantagem do Raspberry Pi Pico:** Opera nativamente em **3.3V**, garantindo 100% de compatibilidade elétrica e segurança para o leitor RC522 sem risco de queima.
 
-![Ligação Direta Sem Protoboard](docs/images/pico_rc522_direct_nobreadboard.jpg)
-*Foto da ligação direta entre o Pico e o RC522 sobre a mesa usando 7 jumpers Macho-Fêmea.*
+![Diagrama Preciso de Ligação Direta](docs/images/diagrama_conexao_preciso.png)
+*Diagrama esquemático de alta precisão com os 40 pinos oficiais do Pico e os 8 pinos do RC522.*
 
 | Componente | Pino no Módulo | Pino Físico no Pico | GPIO RP2040 |
 | :--- | :--- | :--- | :--- |

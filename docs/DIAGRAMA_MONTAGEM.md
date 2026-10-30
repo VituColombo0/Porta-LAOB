@@ -1,34 +1,22 @@
 # 🔌 Diagrama de Ligação Direta Fio-a-Fio (SEM PROTOBOARD)
 
-Este guia foi feito sob medida para quem **NÃO vai usar protoboard** e deseja conectar o Raspberry Pi Pico diretamente ao Leitor RFID-RC522 apenas com os fios jumpers coloridos sobre a mesa.
+Este guia foi elaborado para quem **NÃO vai usar protoboard** e deseja conectar o Raspberry Pi Pico diretamente ao Leitor RFID-RC522 apenas com os 7 fios jumpers coloridos sobre a mesa.
 
 ---
 
-## 📸 1. Foto Real da Ligação Direta (Sem Protoboard)
+## 📐 1. Diagrama Esquemático de Alta Precisão (Sem Alucinações)
 
-Abaixo está a visualização exata de como as duas placas ficam lado a lado sobre a mesa, com cada fio saindo do leitor RFID e entrando diretamente no Raspberry Pi Pico:
+O diagrama abaixo foi gerado matematicamente com as coordenadas exatas dos 40 pinos do Raspberry Pi Pico e dos 8 pinos do MFRC522:
 
-![Ligação Direta Sem Protoboard](images/pico_rc522_direct_nobreadboard.jpg)
+![Diagrama Preciso de Ligação Direta](images/diagrama_conexao_preciso.png)
 
----
-
-## 📸 2. Foto em Detalhe dos Pinos
-
-![Detalhe dos Pinos](images/pico_rc522_closeup.jpg)
+> 💡 **Dica:** Você também pode abrir a versão vetorial [**`diagrama_conexao_preciso.svg`**](images/diagrama_conexao_preciso.svg) para dar zoom infinito sem perder qualidade!
 
 ---
 
-## 🎛️ 2. Montagem Geral na Protoboard
+## 🌐 2. Simulação Visual Interativa no Wokwi
 
-Caso você esteja usando uma protoboard (matriz de contatos) para organizar os componentes:
-
-![Montagem Geral em Protoboard](images/pico_rc522_wiring.jpg)
-
----
-
-## 🌐 3. Simulação Visual Interativa no Wokwi
-
-Adicionamos suporte nativo ao **[Wokwi](https://wokwi.com)**, o simulador eletrônico visual mais avançado da atualidade para Raspberry Pi Pico:
+O **[Wokwi](https://wokwi.com)** é o simulador online padrão da comunidade para testar e visualizar o Raspberry Pi Pico:
 
 * O arquivo [`diagram.json`](../diagram.json) já está na raiz do projeto com todos os componentes pré-conectados:
   * Raspberry Pi Pico (RP2040)
@@ -43,24 +31,24 @@ Adicionamos suporte nativo ao **[Wokwi](https://wokwi.com)**, o simulador eletr�
 
 ---
 
-## 🧐 4. Entendendo os Cabos e Conectores (Macho vs Fêmea)
+## 🧐 3. Entendendo os Cabos e Conectores (Macho vs Fêmea)
 
 Identifique as duas pontas dos seus fios jumpers:
 
 * **Ponta FÊMEA (Oco / Entrada de Plástico):**  
-  Possui um conector quadrado de plástico com um buraquinho no meio. Ela **abraça por cima** os pinos de metal salientes do leitor RFID.
+  Possui um conector quadrado de plástico com um orifício. Ela **abraça por cima** os pinos de metal salientes do leitor RFID.
   ```text
   [======== FÊMEA ]  <-- Encaixa nos pinos machos do Leitor RC522
   ```
 * **Ponta MACHO (Agulha / Pino Metálico):**  
-  Possui um pino rígido de metal exposto. Ela **espeta** nos furos da protoboard ou nos conectores fêmea.
+  Possui um pino rígido de metal exposto. Ela **espeta** nos furos do Pico.
   ```text
-  [======== MACHO ]===>  <-- Espeta na protoboard ou furos do Pico
+  [======== MACHO ]===>  <-- Espeta nos furinhos do Pico
   ```
 
 ---
 
-## 📋 5. Tabela de Ligação Passo a Passo (Fio por Fio)
+## 📋 4. Tabela de Ligação Passo a Passo (Fio por Fio)
 
 Segure o Pico com a **entrada USB virada para CIMA**. Siga esta ordem de cores e pinos:
 
@@ -77,7 +65,7 @@ Segure o Pico com a **entrada USB virada para CIMA**. Siga esta ordem de cores e
 
 ---
 
-## ⚠️ 6. Atenção a Três Detalhes Críticos:
+## ⚠️ 5. Atenção a Três Detalhes Críticos:
 
 1. **Alimentação Estrita de 3.3V:**  
    O pino 40 do Pico (canto superior direito) fornece **5V da USB**. **NUNCA ligue o leitor RFID no pino 40**, pois o chip RC522 não tolera 5V e queimará. Conecte estritamente no **Pino 36 (`3V3 OUT`)**.
