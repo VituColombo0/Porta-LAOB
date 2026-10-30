@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "author": "LAOB - Laboratorio",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-pi-pico",
+      "id": "pico",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "board-mfrc522",
+      "id": "rfid",
+      "top": -60,
+      "left": 160,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay",
+      "top": 180,
+      "left": 160,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_exit",
+      "top": 200,
+      "left": -120,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": 100,
+      "left": -120,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "rfid:3.3V", "pico:3V3", "red", [ "v0" ] ],
+    [ "rfid:GND", "pico:GND.8", "black", [ "v0" ] ],
+    [ "rfid:RST", "pico:GP22", "white", [ "v0" ] ],
+    [ "rfid:MISO", "pico:GP16", "yellow", [ "v0" ] ],
+    [ "rfid:SDA", "pico:GP17", "green", [ "v0" ] ],
+    [ "rfid:SCK", "pico:GP18", "blue", [ "v0" ] ],
+    [ "rfid:MOSI", "pico:GP19", "purple", [ "v0" ] ],
+    [ "rfid:IRQ", "pico:GP14", "gray", [ "v0" ] ],
+
+    [ "relay:IN", "pico:GP15", "orange", [ "v0" ] ],
+    [ "relay:VCC", "pico:VBUS", "red", [ "v0" ] ],
+    [ "relay:GND", "pico:GND.7", "black", [ "v0" ] ],
+
+    [ "btn_exit:1.1", "pico:GP13", "green", [ "v0" ] ],
+    [ "btn_exit:2.1", "pico:GND.5", "black", [ "v0" ] ],
+
+    [ "bz:1", "pico:GP12", "red", [ "v0" ] ],
+    [ "bz:2", "pico:GND.4", "black", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}
