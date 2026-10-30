@@ -2,7 +2,9 @@
 
 Sistema de controle de acesso para porta do laboratório LAOB utilizando leitor RFID-RC522, acionamento eletrônico de fechadura e suporte nativo ao **Raspberry Pi Pico (RP2040)**.
 
-> 📖 **Está começando agora?** Confira o [**Guia Passo a Passo (TUTORIAL_PASSO_A_PASSO.md)**](TUTORIAL_PASSO_A_PASSO.md) com diagramas de fiação, instalação no Thonny e explicação mastigadinha de cada função!
+> 📖 **Guia Rápido e Montagem Física:**
+> * 🔌 [**Diagrama Detalhado de Montagem com Macho/Fêmea (docs/DIAGRAMA_MONTAGEM.md)**](docs/DIAGRAMA_MONTAGEM.md)
+> * 📝 [**Tutorial Passo a Passo de Instalação (TUTORIAL_PASSO_A_PASSO.md)**](TUTORIAL_PASSO_A_PASSO.md)
 
 ---
 
