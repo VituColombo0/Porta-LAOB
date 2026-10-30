@@ -1,14 +1,20 @@
-# 🔌 Diagrama Visual e Físico de Montagem: RC522 + Raspberry Pi Pico
+# 🔌 Diagrama de Ligação Direta Fio-a-Fio (SEM PROTOBOARD)
 
-Este documento apresenta fotos, diagramas visuais, mapeamento de pontas **Macho/Fêmea** e simulação interativa no **Wokwi** para que a montagem seja 100% visual e à prova de erros.
+Este guia foi feito sob medida para quem **NÃO vai usar protoboard** e deseja conectar o Raspberry Pi Pico diretamente ao Leitor RFID-RC522 apenas com os fios jumpers coloridos sobre a mesa.
 
 ---
 
-## 📸 1. Imagem de Ligação Fio por Fio (Foto Realista)
+## 📸 1. Foto Real da Ligação Direta (Sem Protoboard)
 
-Abaixo está a visualização direta de como cada fio sai do leitor RFID azul e se conecta exatamente nos pinos correspondentes do Raspberry Pi Pico:
+Abaixo está a visualização exata de como as duas placas ficam lado a lado sobre a mesa, com cada fio saindo do leitor RFID e entrando diretamente no Raspberry Pi Pico:
 
-![Ligação Direta Fio por Fio](images/pico_rc522_closeup.jpg)
+![Ligação Direta Sem Protoboard](images/pico_rc522_direct_nobreadboard.jpg)
+
+---
+
+## 📸 2. Foto em Detalhe dos Pinos
+
+![Detalhe dos Pinos](images/pico_rc522_closeup.jpg)
 
 ---
 
