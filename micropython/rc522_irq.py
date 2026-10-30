@@ -8,7 +8,7 @@ import time
 from mfrc522 import MFRC522
 
 class RC522_Pico_IRQ:
-    def __init__(self, spi, cs_pin=5, rst_pin=22, irq_pin=4, push_pull=True):
+    def __init__(self, spi, cs_pin=17, rst_pin=22, irq_pin=14, push_pull=True):
         self.rdr = MFRC522(spi, cs_pin, rst_pin)
         self.irq_pin_num = irq_pin
         self.push_pull = push_pull
@@ -25,8 +25,7 @@ class RC522_Pico_IRQ:
 
     def _setup_registers(self):
         # 1. Limpa interrupções pendentes
-        self.rdr._write_reg(self.rdr.ComIrqReg, 0x7F)
-        self.rdr._write_reg(self.rdr.DivIrqReg, 0x7F)
+        self.clear_irq_flags()
 
         # 2. Configura modo elétrico do pino IRQ:
         # Bit 7 = 1 (Push-Pull CMOS padrão) ou 0 (Open-Drain com pull-up)
@@ -67,24 +66,22 @@ class RC522_Pico_IRQ:
         if self._card_flag:
             self._card_flag = False
 
-            # Desativa temporariamente a ISR durante a leitura SPI
+            # Desativa temporariamente a ISR durante a leitura SPI para evitar reentrância
             self.irq_pin.irq(handler=None)
 
-            # Executa a sequência de anticollisão para ler o UID
-            status, bits = self.rdr.request(self.rdr.PICC_REQIDL)
-            if status == self.rdr.OK:
-                status, uid = self.rdr.anticoll()
-                if status == self.rdr.OK and len(uid) >= 4:
-                    uid_str = "{:02X} {:02X} {:02X} {:02X}".format(uid[0], uid[1], uid[2], uid[3])
-                    self._last_uid = uid_str
-                    self._last_read_ms = now
+            # Executa leitura robusta de UID (suporta 4 e 7 bytes)
+            status, uid = self.rdr.read_uid()
+            if status == self.rdr.OK and len(uid) >= 4:
+                uid_str = " ".join("{:02X}".format(b) for b in uid)
+                self._last_uid = uid_str
+                self._last_read_ms = now
 
-                    # Dispara o callback cadastrado
-                    if self._callback:
-                        self._callback(uid_str, uid[:4])
+                # Dispara o callback cadastrado
+                if self._callback:
+                    self._callback(uid_str, uid)
 
-                    # Desliga a comunicação com a tag lida
-                    self.rdr.halt()
+                # Desliga a comunicação com a tag lida
+                self.rdr.halt()
 
             # Limpa flags de interrupção e reativa a ISR
             self.clear_irq_flags()

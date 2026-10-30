@@ -69,6 +69,7 @@ class MFRC522:
     PICC_REQIDL    = 0x26
     PICC_REQALL    = 0x52
     PICC_ANTICOLL  = 0x93
+    PICC_ANTICOLL2 = 0x95 # Cascade level 2 (para tags de 7 bytes)
     PICC_SETECTTAG = 0x93
     PICC_AUTHENT1A = 0x60
     PICC_AUTHENT1B = 0x61
@@ -131,6 +132,10 @@ class MFRC522:
         self._write_reg(self.ModeReg, 0x3D)
         self.antenna_on()
 
+    def get_version(self):
+        """Retorna a versão do chip. Valores esperados: 0x91 (v1.0) ou 0x92 (v2.0)"""
+        return self._read_reg(self.VersionReg)
+
     def antenna_on(self):
         val = self._read_reg(self.TxControlReg)
         if (val & 0x03) != 0x03:
@@ -170,7 +175,9 @@ class MFRC522:
         while True:
             n = self._read_reg(self.ComIrqReg)
             i -= 1
-            if ~((i != 0) and not (n & 0x01) and not (n & wait_irq)):
+            # Correção crítica do bug lógico de '~' em Python:
+            # Sai do laço se: estourou o timeout (i == 0) OU ocorreu erro (bit 0) OU recebeu interrupção esperada
+            if (i == 0) or (n & 0x01) or (n & wait_irq):
                 break
 
         self._clear_bit_mask(self.BitFramingReg, 0x80)
@@ -196,25 +203,56 @@ class MFRC522:
 
         return status, back_data, back_len
 
-    def request(self, req_mode):
+    def request(self, req_mode=0x26):
         self._write_reg(self.BitFramingReg, 0x07)
         status, back_data, back_bits = self._to_card(self.PCD_TRANSCEIVE, [req_mode])
         if status != self.OK or back_bits != 0x10:
             status = self.ERR
         return status, back_bits
 
-    def anticoll(self):
+    def anticoll(self, level=1):
+        """
+        Executa a sequência de anticollisão.
+        level=1: padrão para 4 bytes (Cascade Level 1).
+        level=2: para tags de 7 bytes (Cascade Level 2).
+        """
+        cmd = self.PICC_ANTICOLL if level == 1 else self.PICC_ANTICOLL2
         self._write_reg(self.BitFramingReg, 0x00)
-        status, back_data, _ = self._to_card(self.PCD_TRANSCEIVE, [self.PICC_ANTICOLL, 0x20])
+        status, back_data, _ = self._to_card(self.PCD_TRANSCEIVE, [cmd, 0x20])
         if status == self.OK:
             if len(back_data) == 5:
-                # Verificação de checksum
+                # Verificação de checksum BCC
                 checksum = back_data[0] ^ back_data[1] ^ back_data[2] ^ back_data[3]
                 if checksum != back_data[4]:
                     status = self.ERR
             else:
                 status = self.ERR
         return status, back_data
+
+    def read_uid(self):
+        """
+        Helper de alto nível para ler o UID completo de uma tag.
+        Suporta tanto tags clássicas de 4 bytes (Mifare 1K) quanto de 7 bytes (NTAG / Ultralight).
+        Retorna (status, uid_list)
+        """
+        status, _ = self.request(self.PICC_REQIDL)
+        if status != self.OK:
+            return self.ERR, []
+
+        status, uid1 = self.anticoll(level=1)
+        if status != self.OK:
+            return self.ERR, []
+
+        # Se o primeiro byte for 0x88 (CT - Cascade Tag), significa que a tag tem 7 bytes
+        if uid1[0] == 0x88:
+            status, uid2 = self.anticoll(level=2)
+            if status == self.OK:
+                # Monta os 7 bytes: 3 bytes do nível 1 + 4 bytes do nível 2
+                full_uid = [uid1[1], uid1[2], uid1[3], uid2[0], uid2[1], uid2[2], uid2[3]]
+                return self.OK, full_uid
+            return self.OK, uid1[:4]
+
+        return self.OK, uid1[:4]
 
     def halt(self):
         self._write_reg(self.BitFramingReg, 0x00)

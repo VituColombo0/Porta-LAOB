@@ -1,92 +1,58 @@
 """
-Porta-LAOB - Controle de Acesso com Interrupção por Hardware (IRQ)
+Porta-LAOB - Modo Interrupção por Hardware (IRQ)
 Plataforma: Raspberry Pi Pico (MicroPython)
+Arquivo: main_irq.py (Modo alternativo usando pino IRQ)
 
-Pinagem Recomendada no Pico:
-  MFRC522      Raspberry Pi Pico
-  -------------------------------
-  VCC (3.3V)-> 3V3 OUT (Pino 36)
-  GND       -> GND (Pino 38)
-  RST       -> GP22 (Pino 29)
-  IRQ       -> GP14 (Pino 19) [Interrupção Externa]
-  MISO (RX) -> GP16 (Pino 21) [SPI0 RX]
-  MOSI (TX) -> GP19 (Pino 25) [SPI0 TX]
-  SCK       -> GP18 (Pino 24) [SPI0 SCK]
-  SDA (CS)  -> GP17 (Pino 22) [SPI0 CS]
-  -------------------------------
-  RELÉ      -> GP15 (Pino 20) [Trava da Porta]
-  BUZZER    -> GP13 (Pino 17) [Opcional]
+Este script usa o pino GP14 para receber a interrupção física de borda de descida
+do leitor RC522 quando uma tag é aproximada, sem uso de laços bloqueantes.
 """
 
 from machine import Pin, SPI
 import time
 from rc522_irq import RC522_Pico_IRQ
+from door_manager import DoorManager
 
-# Configuração dos Pinos
-PIN_SCK  = 18
-PIN_MOSI = 19
-PIN_MISO = 16
-PIN_CS   = 17
-PIN_RST  = 22
-PIN_IRQ  = 14
-PIN_RELE = 15
-PIN_LED  = "LED" # LED onboard do Pico
+# Definições de Pinos
+PIN_SCK    = 18
+PIN_MOSI   = 19
+PIN_MISO   = 16
+PIN_CS     = 17
+PIN_RST    = 22
+PIN_IRQ    = 14
+PIN_RELE   = 15
+PIN_BOTAO  = 13
+PIN_BUZZER = 12
+PIN_SENSOR = 11
 
-rele = Pin(PIN_RELE, Pin.OUT)
-rele.value(0) # Trava fechada
+door = DoorManager(relay_pin=PIN_RELE,
+                   button_pin=PIN_BOTAO,
+                   buzzer_pin=PIN_BUZZER,
+                   sensor_pin=PIN_SENSOR,
+                   relay_active_high=True)
 
-led_onboard = Pin(PIN_LED, Pin.OUT)
-
-# Lista de UIDs autorizados no LAOB (adicione as tags do seu laboratório aqui)
-TAGS_AUTORIZADAS = [
-    "A1 B2 C3 D4",
-    "43 8A 1F 2C"
-]
-
-def abrir_porta():
-    print("[PORTA-LAOB] ACESSO LIBERADO! Abrindo trava...")
-    led_onboard.value(1)
-    rele.value(1) # Aciona relé
-    time.sleep(3) # Mantém aberta por 3 segundos
-    rele.value(0) # Trava novamente
-    led_onboard.value(0)
-    print("[PORTA-LAOB] Porta trancada com sucesso.")
-
-def quando_cartao_detectado(uid_str, uid_bytes):
-    print("\n-------------------------------------------")
-    print(f">> CARTÃO DETECTADO VIA IRQ! UID: {uid_str}")
-    
-    if uid_str in TAGS_AUTORIZADAS:
-        abrir_porta()
-    else:
-        print("[ACESSO NEGADO] Tag não cadastrada no LAOB.")
-        # Pisca LED 3 vezes indicando erro
-        for _ in range(3):
-            led_onboard.value(1)
-            time.sleep_ms(100)
-            led_onboard.value(0)
-            time.sleep_ms(100)
-    print("-------------------------------------------\n")
+def quando_tag_detectada(uid_str, uid_bytes):
+    door.process_uid(uid_str)
 
 def main():
-    print("Iniciando Porta-LAOB no Raspberry Pi Pico...")
-    
-    # Inicializa o barramento SPI0 de hardware do RP2040
+    print("==================================================")
+    print("   Porta-LAOB - Modo Interrupção por Hardware     ")
+    print("==================================================")
+
     spi = SPI(0, baudrate=1_000_000, polarity=0, phase=0,
               sck=Pin(PIN_SCK), mosi=Pin(PIN_MOSI), miso=Pin(PIN_MISO))
 
-    # Inicializa o driver com suporte a IRQ
     rfid = RC522_Pico_IRQ(spi, cs_pin=PIN_CS, rst_pin=PIN_RST, irq_pin=PIN_IRQ, push_pull=True)
-    rfid.on_card(quando_cartao_detectado)
+    rfid.on_card(quando_tag_detectada)
 
-    print("Leitor RFID pronto e operando por interrupção. Aproxime a tag...")
+    print(f"[OK] Leitor configurado no pino IRQ GP{PIN_IRQ}. Aguardando crachás...")
 
     while True:
-        # Atualiza a máquina de estados (não-bloqueante)
+        # Atualiza a máquina de estados não-bloqueante
         rfid.update()
 
-        # O loop principal fica livre para executar outras rotinas
-        # (ex: checar botão de saída da sala, sensor de porta aberta, etc.)
+        # Verifica botoeira e sensor de porta
+        door.check_inputs()
+
         time.sleep_ms(20)
 
 if __name__ == "__main__":
