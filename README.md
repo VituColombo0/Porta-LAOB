@@ -37,10 +37,16 @@ Porta-LAOB/
 │   ├── door_manager.py                    # Gerenciador da fechadura, tags JSON, admin e logs
 │   ├── main_irq.py                        # Exemplo alternativo via pino IRQ
 │   └── main_multicore.py                  # Exemplo simplificado de uso Dual-Core
+├── tools/
+│   └── pico_tool.py                       # Ferramenta CLI de detecção, upload e monitor serial
 ├── tests/
 │   └── test_door_logic.py                 # Suíte de testes unitários automatizados (100% aprovada)
 ├── docs/
-│   └── analise_interrupcao_rc522.md       # Estudo aprofundado dos registradores e bugs
+│   ├── DIAGRAMA_MONTAGEM.md               # Guia visual com fotos e conectores macho/fêmea
+│   ├── analise_interrupcao_rc522.md       # Estudo aprofundado dos registradores e bugs
+│   └── images/                            # Fotos de alta definição da ligação direta
+├── diagram.json                           # Simulação visual interativa 2D do Wokwi
+├── wokwi.toml                             # Configuração do simulador Wokwi
 ├── include/
 │   └── RC522_Interrupt.h                 # Driver C++ para Arduino/Pico C SDK
 ├── src/
@@ -55,9 +61,12 @@ Porta-LAOB/
 
 ---
 
-## 🔌 Pinagem no Raspberry Pi Pico
+## 🔌 Ligação Direta Fio-a-Fio (Sem Protoboard)
 
 > 💡 **Vantagem do Raspberry Pi Pico:** Opera nativamente em **3.3V**, garantindo 100% de compatibilidade elétrica e segurança para o leitor RC522 sem risco de queima.
+
+![Ligação Direta Sem Protoboard](docs/images/pico_rc522_direct_nobreadboard.jpg)
+*Foto da ligação direta entre o Pico e o RC522 sobre a mesa usando 7 jumpers Macho-Fêmea.*
 
 | Componente | Pino no Módulo | Pino Físico no Pico | GPIO RP2040 |
 | :--- | :--- | :--- | :--- |
