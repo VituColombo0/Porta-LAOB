@@ -74,3 +74,8 @@ Segure o Pico com a **entrada USB virada para CIMA**. Siga esta ordem de cores e
    `SDA` — `SCK` — `MOSI` — `MISO` — `IRQ` — `GND` — `RST` — `3.3V`.
 3. **Firmeza dos Conectores:**  
    Certifique-se de que a ponta fêmea está bem ajustada no pino metálico e não está frouxa. Mau contato é o principal motivo de falha de leitura em módulos SPI.
+4. **Por que o SDA (CS) fica no Pino 22 (GP17) e NÃO no Pino 20 (GP15)?**  
+   * No Raspberry Pi Pico, o pino nativo `SPI0 CSn` é o **GP17 (Pino 22)**.
+   * O **Pino 20 (GP15)** é reservado e acionado pelo código ([`main.py`](../micropython/main.py#L36)) para o **Relé da Trava da Porta**. Ligar o RFID no GP15 causaria conflito entre a trava e o leitor.
+   * O **RST (Reset)** fica no **Pino 29 (GP22)**, mantendo todos os 7 fios do RFID agrupados no lado direito do Pico!
+
