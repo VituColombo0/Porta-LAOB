@@ -1,98 +1,160 @@
-# Porta-LAOB 🚪🔑
+# Porta-LAOB
 
-Sistema de controle de acesso para porta do laboratório LAOB utilizando leitor RFID-RC522, acionamento eletrônico de fechadura e suporte nativo ao **Raspberry Pi Pico (RP2040)**.
+Sistema embarcado de controle de acesso para portas de laboratório utilizando microcontrolador Raspberry Pi Pico (RP2040), leitor RFID MFRC522 e acionamento eletrônico de fechadura via relé.
 
-> 📖 **Guia Rápido e Montagem Física:**
-> * 🔌 [**Diagrama Detalhado de Montagem com Macho/Fêmea (docs/DIAGRAMA_MONTAGEM.md)**](docs/DIAGRAMA_MONTAGEM.md)
-> * 📝 [**Tutorial Passo a Passo de Instalação (TUTORIAL_PASSO_A_PASSO.md)**](TUTORIAL_PASSO_A_PASSO.md)
-
----
-
-## 🎯 Missão 1: Tratamento do RFID-RC522 e o Desafio da Interrupção (IRQ)
-
-### O Problema Encontrado
-A biblioteca padrão para o leitor RC522 (`miguelbalboa/rfid`) inclui um exemplo chamado `MinimalInterrupt.ino`, porém **ele não funciona na prática** para a maioria dos desenvolvedores. Os sintomas comuns são:
-1. **Travamento no boot:** O código congela dentro do `setup()` devido ao laço bloqueante `do { } while (!bNewInt);`.
-2. **Leitura única:** Após ler o primeiro cartão, a linha IRQ não desarma corretamente e o leitor para de responder.
-3. **Mito do "Wake-on-Card":** O chip MFRC522 **não possui hardware de detecção autônoma de presença de cartão (LPCD)** como o PN532. Ele não acorda um microcontrolador em Deep Sleep por aproximação sem que o transmissor esteja emitindo o comando `REQA`.
-
-### A Solução Implementada no Porta-LAOB
-Desenvolvemos soluções completas, testadas e prontas para uso:
-* **MicroPython Dual-Core com Auto-Boot ([`micropython/main.py`](micropython/main.py)):** Aproveita os 2 núcleos do processador RP2040 do Raspberry Pi Pico. O **Core 1** varre o leitor RFID em tempo real em segundo plano, enquanto o **Core 0** gerencia a fechadura, botoeira de saída interna, sensor de porta aberta e feedback sonoro.
-* **MicroPython com IRQ por Hardware ([`micropython/rc522_irq.py`](micropython/rc522_irq.py) e [`micropython/main_irq.py`](micropython/main_irq.py)):** Configuração direta dos registradores `ComIEnReg` e `DivIEnReg` sem travamentos de boot e com re-armação automática.
-* **Gerenciador de Acesso Completo ([`micropython/door_manager.py`](micropython/door_manager.py)):** Persistência de crachás em JSON na memória flash, modo Master (cadastre novos crachás aproximando o cartão administrador), botoeira de saída e logs de auditoria.
-* **Driver C++ Multiplataforma ([`include/RC522_Interrupt.h`](include/RC522_Interrupt.h) e [`src/RC522_Interrupt.cpp`](src/RC522_Interrupt.cpp)):** Para uso com Arduino IDE ou Pico C/C++ SDK.
+[![Platform: RP2040](https://img.shields.io/badge/Platform-RP2040%20%7C%20Pico-blue.svg)](https://www.raspberrypi.com/products/raspberry-pi-pico/)
+[![Firmware: MicroPython](https://img.shields.io/badge/Firmware-MicroPython-informational.svg)](https://micropython.org/)
+[![C++ SDK](https://img.shields.io/badge/Driver-C%2B%2B%20%2F%20Arduino-darkgreen.svg)](https://github.com/VituColombo0/Porta-LAOB)
+[![Simulator: Wokwi](https://img.shields.io/badge/Simulation-Wokwi%202D-orange.svg)](wokwi.toml)
 
 ---
 
-## 📁 Estrutura do Repositório
+## Documentação Técnica
+
+- [Diagrama Detalhado de Montagem e Conectores Macho/Fêmea](docs/DIAGRAMA_MONTAGEM.md)
+- [Tutorial Passo a Passo de Instalação e Configuração](TUTORIAL_PASSO_A_PASSO.md)
+- [Estudo Técnico dos Registradores e Análise de IRQ no RC522](docs/analise_interrupcao_rc522.md)
+- [Simulação Interativa Wokwi](wokwi.toml)
+
+---
+
+## Arquitetura e Engenharia do Sistema
+
+O projeto resolve desafios críticos de confiabilidade frequentemente encontrados no uso do leitor MFRC522 com microcontroladores de baixo custo:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 Raspberry Pi Pico (RP2040)                  │
+├──────────────────────────────┬──────────────────────────────┤
+│            Core 0            │            Core 1            │
+│  - Gestão de fechadura       │  - Varredura contínua SPI    │
+│  - Botoeira interna (GP13)   │  - Leitura rápida de UID     │
+│  - Sensor de porta (GP11)    │  - Decodificação 4/7 bytes   │
+│  - Feedback sonoro (GP12)    │  - Fila thread-safe de tags  │
+│  - Persistência em JSON      │                              │
+└──────────────┬───────────────┴──────────────┬───────────────┘
+               │                              │
+               ▼                              ▼
+      [ Relé / Fechadura ]            [ MFRC522 Leitor ]
+```
+
+### Análise da Linha IRQ e Limitações do MFRC522
+
+O exemplo clássico `MinimalInterrupt.ino` distribuído na biblioteca padrão de Arduino apresenta falhas estruturais em cenários de produção:
+1. **Travamento no Boot:** Um laço bloqueante `do { } while (!bNewInt);` no setup interrompe a inicialização caso o registrador de interrupções não inicialize com a linha em nível baixo.
+2. **Perda de Re-armação:** Após a primeira leitura de cartão, as flags de interrupção (`ComIrqReg` e `DivIrqReg`) deixam de ser limpas adequadamente em alguns clones do chip, travando leituras subsequentes.
+3. **Ausência de LPCD Nativo:** O chip MFRC522 não possui detecção passiva de baixa potência por aproximação (LPCD), diferentemente de controladores como o PN532. Ele requer transmissão ativa de campo magnético (`REQA`/`WUPA`) para detectar o cartão.
+
+### Soluções Implementadas no Porta-LAOB
+
+- **Arquitetura Dual-Core em MicroPython ([`micropython/main.py`](micropython/main.py)):** Isola a rotina de varredura SPI do leitor no **Core 1**, mantendo o **Core 0** 100% responsivo para a botoeira de saída interna, temporização da trava e sinalização sonora, sem travamentos na interface.
+- **Tratamento de IRQ em Nível de Hardware ([`micropython/rc522_irq.py`](micropython/rc522_irq.py)):** Controle direto dos registradores `ComIEnReg` e `DivIEnReg`, com re-armação e limpeza atômica das interrupções.
+- **Gerenciador de Acesso Autônomo ([`micropython/door_manager.py`](micropython/door_manager.py)):** Armazenamento das tags autorizadas em arquivo JSON na flash interna (`authorized_tags.json`). Inclui modo Administrador (cartão Master para cadastro/exclusão direta na porta sem necessidade de computador) e registro de logs de auditoria.
+- **Driver C++ Otimizado ([`include/RC522_Interrupt.h`](include/RC522_Interrupt.h), [`src/RC522_Interrupt.cpp`](src/RC522_Interrupt.cpp)):** Disponível para projetos com Pico C/C++ SDK ou Arduino IDE.
+
+---
+
+## Esquema de Ligação Fio-a-Fio (3.3V)
+
+> **Compatibilidade Elétrica:** O Raspberry Pi Pico opera nativamente em níveis lógicos de 3.3V, garantindo compatibilidade direta com o MFRC522 sem necessidade de shifters de nível bidirecionais.
+
+![Diagrama Preciso de Ligação Direta](docs/images/diagrama_conexao_preciso.png)
+
+| Dispositivo | Pino no Módulo | Pino Físico (Pico) | GPIO RP2040 | Descrição / Função |
+| :--- | :--- | :--- | :--- | :--- |
+| **MFRC522** | **3.3V (VCC)** | Pino 36 | `3V3 OUT` | Alimentação regulada 3.3V |
+| **MFRC522** | **GND** | Pino 38 | `GND` | Terra comum |
+| **MFRC522** | **RST** | Pino 29 | `GP22` | Reset de hardware |
+| **MFRC522** | **IRQ** | Pino 18 | `GP14` | Interrupção por hardware |
+| **MFRC522** | **MISO** | Pino 21 | `GP16` | SPI0 RX |
+| **MFRC522** | **MOSI** | Pino 25 | `GP19` | SPI0 TX |
+| **MFRC522** | **SCK** | Pino 24 | `GP18` | SPI0 Clock |
+| **MFRC522** | **SDA (CS)** | Pino 22 | `GP17` | SPI0 Chip Select |
+| **Fechadura** | Sinal Relé | Pino 19 | `GP15` | Acionamento da solenoide/eletroímã |
+| **Botoeira** | Saída Interna | Pino 17 | `GP13` | Entrada com Pull-up interno |
+| **Buzzer** | Terminal (+) | Pino 16 | `GP12` | Feedback sonoro (PWM/Beep) |
+| **Sensor Porta** | Reed Switch | Pino 15 | `GP11` | Monitor de abertura (Opcional) |
+
+---
+
+## Estrutura do Repositório
 
 ```text
 Porta-LAOB/
-├── TUTORIAL_PASSO_A_PASSO.md              # Guia completo mastigadinho de montagem e uso
+├── TUTORIAL_PASSO_A_PASSO.md      # Instruções de montagem mecânica e elétrica
 ├── micropython/
-│   ├── main.py                            # Script principal auto-executável no boot do Pico
-│   ├── mfrc522.py                         # Driver MFRC522 corrigido e otimizado (4 e 7 bytes)
-│   ├── rc522_irq.py                       # Driver com interrupção por hardware (IRQ)
-│   ├── door_manager.py                    # Gerenciador da fechadura, tags JSON, admin e logs
-│   ├── main_irq.py                        # Exemplo alternativo via pino IRQ
-│   └── main_multicore.py                  # Exemplo simplificado de uso Dual-Core
+│   ├── main.py                    # Aplicação Dual-Core principal de boot
+│   ├── mfrc522.py                 # Driver SPI MFRC522 otimizado (4 e 7 bytes)
+│   ├── rc522_irq.py               # Driver com interrupção por hardware
+│   ├── door_manager.py            # Validação de credenciais, logs e modo Master
+│   ├── main_irq.py                # Implementação alternativa orientada a IRQ
+│   └── main_multicore.py          # Exemplo enxuto de operação multicore
 ├── tools/
-│   └── pico_tool.py                       # Ferramenta CLI de detecção, upload e monitor serial
+│   └── pico_tool.py               # Utilitário CLI para detecção, upload e monitor serial
 ├── tests/
-│   └── test_door_logic.py                 # Suíte de testes unitários automatizados (100% aprovada)
+│   └── test_door_logic.py         # Testes automatizados da lógica de permissão
 ├── docs/
-│   ├── DIAGRAMA_MONTAGEM.md               # Guia visual com fotos e conectores macho/fêmea
-│   ├── analise_interrupcao_rc522.md       # Estudo aprofundado dos registradores e bugs
-│   └── images/                            # Fotos de alta definição da ligação direta
-├── diagram.json                           # Simulação visual interativa 2D do Wokwi
-├── wokwi.toml                             # Configuração do simulador Wokwi
+│   ├── DIAGRAMA_MONTAGEM.md       # Diagrama fotográfico com guias de crimpagem
+│   ├── analise_interrupcao_rc522.md # Investigação aprofundada de hardware
+│   └── images/                    # Imagens esquemáticas de pinagem
 ├── include/
-│   └── RC522_Interrupt.h                 # Driver C++ para Arduino/Pico C SDK
+│   └── RC522_Interrupt.h         # Headers C++ para SDK nativo
 ├── src/
-│   └── RC522_Interrupt.cpp               # Implementação C++ com controle de registradores
+│   └── RC522_Interrupt.cpp       # Implementação em C++
 ├── examples/
-│   ├── BasicInterrupt/
-│   │   └── BasicInterrupt.ino             # Exemplo básico C++ de interrupção
-│   └── ESP32_FreeRTOS_Async/
-│       └── ESP32_FreeRTOS_Async.ino       # Arquitetura com FreeRTOS para ESP32
-└── README.md
+│   ├── BasicInterrupt/            # Exemplo C++ standalone
+│   └── ESP32_FreeRTOS_Async/      # Implementação para ESP32 via filas FreeRTOS
+├── diagram.json                   # Esquema para simulação no Wokwi
+└── wokwi.toml                     # Metadados de ambiente Wokwi
 ```
 
 ---
 
-## 🔌 Ligação Direta Fio-a-Fio (Sem Protoboard)
+## Instalação e Uso
 
-> 💡 **Vantagem do Raspberry Pi Pico:** Opera nativamente em **3.3V**, garantindo 100% de compatibilidade elétrica e segurança para o leitor RC522 sem risco de queima.
+### Opção 1: Upload via `pico_tool.py` (Recomendado)
 
-![Diagrama Preciso de Ligação Direta](docs/images/diagrama_conexao_preciso.png)
-*Diagrama esquemático de alta precisão com os 40 pinos oficiais do Pico e os 8 pinos do RC522.*
+O repositório inclui uma ferramenta CLI em Python para gerenciar o dispositivo sem IDE gráfica:
 
-| Componente | Pino no Módulo | Pino Físico no Pico | GPIO RP2040 |
-| :--- | :--- | :--- | :--- |
-| **MFRC522** | **3.3V (VCC)** | **Pino 36** | `3V3 OUT` *(estritamente 3.3V)* |
-| **MFRC522** | **GND** | **Pino 38** | `GND` |
-| **MFRC522** | **RST** | **Pino 29** | `GP22` |
-| **MFRC522** | **IRQ** | **Pino 18** | `GP14` *(interrupção de hardware)* |
-| **MFRC522** | **MISO** | **Pino 21** | `GP16` *(SPI0 RX)* |
-| **MFRC522** | **MOSI** | **Pino 25** | `GP19` *(SPI0 TX)* |
-| **MFRC522** | **SCK** | **Pino 24** | `GP18` *(SPI0 SCK)* |
-| **MFRC522** | **SDA (CS)** | **Pino 22** | `GP17` *(SPI0 CSn)* |
-| --- | --- | --- | --- |
-| **Trava/Fechadura**| **Relé (Sinal)** | **Pino 19** | `GP15` |
-| **Botoeira Saída** | **Botão Interno**| **Pino 17** | `GP13` *(Pull-up interno)* |
-| **Buzzer** | **Buzzer (+)** | **Pino 16** | `GP12` *(PWM opcional)* |
-| **Sensor de Porta**| **Reed Switch** | **Pino 15** | `GP11` *(Opcional)* |
+```bash
+# Detectar dispositivo conectado na porta serial
+python tools/pico_tool.py list
+
+# Enviar os arquivos do firmware para a raiz do Pico
+python tools/pico_tool.py upload micropython/mfrc522.py micropython/door_manager.py micropython/main.py
+
+# Acompanhar a execução em tempo real via terminal serial
+python tools/pico_tool.py monitor
+```
+
+### Opção 2: Via Thonny IDE
+
+1. Instale o firmware oficial do MicroPython no Raspberry Pi Pico.
+2. Abra o **Thonny IDE** e selecione o interpretador `MicroPython (Raspberry Pi Pico)`.
+3. Transfira para a raiz (`/`) da placa os arquivos:
+   - `micropython/mfrc522.py`
+   - `micropython/door_manager.py`
+   - `micropython/main.py`
+4. Reinicie a alimentação da placa. O script `main.py` inicia automaticamente na inicialização.
+
+### Fluxo de Gerenciamento de Acesso
+
+1. **Primeira Inicialização:** O sistema detecta a ausência de um cartão mestre. Aproxime a tag que será designada como **Administrador (Master)**. O sistema emitirá confirmação sonora e salvará a tag.
+2. **Cadastro de Novos Usuários:** Aproxime a tag Master. O sistema entrará no modo de cadastro (sinalizado por bipes intermitentes). Aproxime o novo crachá para registrá-lo.
+3. **Exclusão de Usuários:** Aproxime a tag Master duas vezes seguidas para acessar o modo de exclusão e aproxime a tag a ser revogada.
 
 ---
 
-## 🚀 Como Colocar para Funcionar Agora
+## Testes Automatizados
 
-1. Conecte o Pico no PC e abra o **Thonny IDE**.
-2. Copie para a raiz (`/`) do Raspberry Pi Pico os arquivos da pasta `micropython/`:
-   * `mfrc522.py`
-   * `door_manager.py`
-   * `main.py`
-3. Ao ligar a placa, o `main.py` rodará automaticamente!
-4. **Primeiro uso:** Aproxime o crachá que você deseja que seja o **Administrador (Master)**. O sistema salvará e confirmará com bip.
-5. Para cadastrar novos alunos, aproxime o crachá Master (entra no modo cadastro) e em seguida aproxime a tag do aluno!
+O repositório possui suíte de testes unitários que valida as regras de transição de estado da trava, timeouts de segurança e permissões:
+
+```bash
+python -m unittest tests/test_door_logic.py
+```
+
+---
+
+## Licença
+
+Desenvolvido para o Laboratório LAOB. Código aberto para fins acadêmicos e laboratoriais.
